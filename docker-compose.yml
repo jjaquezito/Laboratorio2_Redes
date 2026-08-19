@@ -1,0 +1,29 @@
+# Laboratorio 2 (CC3067 Redes) — levanta emisor y receptor juntos.
+#
+#   docker compose up --build
+#
+# Emisor  -> http://localhost:8000
+# Receptor -> http://localhost:3000  (datos TCP en 5001, expuesto por si el
+#             emisor se ejecuta fuera de Docker durante el desarrollo)
+#
+# El emisor resuelve "receptor" por nombre de servicio en la red interna de
+# Compose (RECEPTOR_HOST); no requiere ningún paso manual.
+
+services:
+  receptor:
+    build:
+      context: ./receptor
+    ports:
+      - "3000:3000"
+      - "5001:5001"
+
+  emisor:
+    build:
+      context: ./emisor
+    ports:
+      - "8000:8000"
+    environment:
+      RECEPTOR_HOST: receptor
+      RECEPTOR_PUERTO: "5001"
+    depends_on:
+      - receptor

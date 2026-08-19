@@ -16,12 +16,15 @@
 from __future__ import annotations
 
 import json
+import os
 import socket
 from dataclasses import dataclass, field
 from typing import Any
 
-HOST_POR_DEFECTO = "127.0.0.1"
-PUERTO_POR_DEFECTO = 5001
+# En Docker Compose, RECEPTOR_HOST="receptor" (nombre del servicio); en
+# desarrollo local, sin la variable definida, cae en localhost.
+HOST_POR_DEFECTO = os.environ.get("RECEPTOR_HOST", "127.0.0.1")
+PUERTO_POR_DEFECTO = int(os.environ.get("RECEPTOR_PUERTO", "5001"))
 TIMEOUT_POR_DEFECTO = 5.0
 
 
