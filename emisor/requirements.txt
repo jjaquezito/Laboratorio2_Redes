@@ -1,0 +1,7 @@
+# Emisor — Laboratorio 2 (CC3067 Redes)
+fastapi>=0.115
+uvicorn[standard]>=0.30
+pydantic>=2.7
+
+# Desarrollo
+pytest>=8.0
