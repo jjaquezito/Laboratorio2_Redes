@@ -1,6 +1,4 @@
-// Tests de las capas del receptor y del contrato de trama (PROTOCOLO.md).
-// Espejo parcial de emisor/tests/test_capas.py — solo lo que aplica al
-// receptor (el emisor es quien posee ruido/aplicacion.preparar_envio).
+// Tests de las capas del receptor y del contrato de trama.
 
 import { readFileSync } from "node:fs";
 import net from "node:net";
@@ -41,10 +39,6 @@ function vector(mensaje: string, algoritmo: "hamming" | "crc32", m?: number): Ve
   return encontrado;
 }
 
-// -----------------------------------------------------------------------------
-// PRESENTACIÓN (§4)
-// -----------------------------------------------------------------------------
-
 describe("presentacion", () => {
   it("decodifica ASCII de 8 bits", () => {
     expect(presentacion.decodificarMensaje("01000001")).toBe("A");
@@ -52,7 +46,7 @@ describe("presentacion", () => {
   });
 
   it("descarta el relleno con longitudOriginalBits", () => {
-    const bits = "0100100001101001"; // "Hi"
+    const bits = "0100100001101001";
     expect(presentacion.decodificarMensaje(bits + "0".repeat(24), bits.length)).toBe("Hi");
   });
 
@@ -60,10 +54,6 @@ describe("presentacion", () => {
     expect(() => presentacion.decodificarMensaje("0101")).toThrow(presentacion.ErrorPresentacion);
   });
 });
-
-// -----------------------------------------------------------------------------
-// ENLACE (§5, §6)
-// -----------------------------------------------------------------------------
 
 describe("enlace", () => {
   it("normaliza params", () => {
@@ -89,10 +79,6 @@ describe("enlace", () => {
     expect(resultado.estado).toBe("ok");
   });
 });
-
-// -----------------------------------------------------------------------------
-// APLICACIÓN (§2) — pipeline completo del receptor
-// -----------------------------------------------------------------------------
 
 describe("aplicacion.procesarTrama", () => {
   it("mensaje íntegro sale igual al original (hamming)", () => {
@@ -133,10 +119,6 @@ describe("aplicacion.procesarTrama", () => {
     expect(resultado.mensaje).toBeNull();
   });
 });
-
-// -----------------------------------------------------------------------------
-// TRANSMISIÓN (§1, §3) — servidor TCP real
-// -----------------------------------------------------------------------------
 
 describe("transmision", () => {
   it("recibe NDJSON y responde telemetría por el mismo socket", async () => {

@@ -1,29 +1,9 @@
-// -----------------------------------------------------------------------------
-// Hamming(n, m) genérico — algoritmo de CORRECCIÓN de errores
-// Especificación: shared/PROTOCOLO.md §5
-// -----------------------------------------------------------------------------
-// Redundancia : r = mínimo entero que cumple  m + r + 1 <= 2**r ;  n = m + r
-// Posiciones  : indexadas desde 1; los bits de paridad ocupan las potencias de
-//               dos (1, 2, 4, 8, ...) y los de datos rellenan el resto en orden
-// Cobertura   : el bit de paridad en 2**i cubre toda posición j con
-//               j & 2**i != 0, incluyéndose a sí mismo. Paridad par: el XOR de
-//               las posiciones cubiertas debe dar 0
-// Bloques     : el bitstream se parte en bloques de m bits y el último se
-//               rellena con ceros. Cada bloque se codifica por separado, de modo
-//               que se corrige un error POR BLOQUE y no uno en toda la trama
-//
-// Valores de referencia:
-//   m=4 -> n=7   ·   m=8 -> n=12   ·   m=11 -> n=15   ·   m=16 -> n=21
-//
-// Debe producir exactamente lo mismo que el hamming.py del emisor; los
-// vectores dorados de shared/vectores.json lo verifican.
-// -----------------------------------------------------------------------------
+// Hamming(n, m) por bloques. Especificación: shared/PROTOCOLO.md §5.
+// Debe producir lo mismo que hamming.py del emisor (shared/vectores.json).
 
 export const NOMBRE = "hamming" as const;
 export const TIPO = "correccion" as const;
 
-// `m` ofrecidos en la interfaz. Cualquier m >= 1 funciona, estos son los
-// tamaños con los que se generan las gráficas de overhead vs m.
 export const M_SUGERIDOS = [4, 8, 11, 16] as const;
 
 // Parámetros o trama inválidos para Hamming.
@@ -137,8 +117,7 @@ export interface ResultadoHamming {
   readonly overhead: number;
 }
 
-// Codifica un bitstream completo en modo por bloques.
-// El último bloque se rellena con ceros; longitudOriginalBits lo descarta.
+// Codifica el bitstream en bloques de m bits; el último se rellena con ceros.
 export function codificar(bits: string, m = 8): ResultadoHamming {
   if (!/^[01]*$/.test(bits)) {
     throw new ErrorHamming("el bitstream solo puede contener '0' y '1'");
@@ -157,8 +136,7 @@ export function codificar(bits: string, m = 8): ResultadoHamming {
     bloques.push(codificarBloque(acolchado.slice(i, i + m), m));
   }
 
-  // Posiciones absolutas de los bits de paridad dentro de la trama completa,
-  // para que el frontend pueda resaltarlas.
+  // Posiciones absolutas de los bits de paridad, para resaltarlas en la UI.
   const paridadLocal = posicionesDeParidad(n);
   const posicionesRedundancia: number[] = [];
   for (let indice = 0; indice < bloques.length; indice++) {

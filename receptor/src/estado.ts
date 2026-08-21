@@ -1,8 +1,5 @@
-// -----------------------------------------------------------------------------
-// Historial en memoria — alimenta la UI del receptor (extensión fuera del
-// enunciado, igual que la telemetría del §3 del protocolo). No es parte del
-// contrato de trama: el emisor nunca ve este módulo.
-// -----------------------------------------------------------------------------
+// Historial en memoria para la UI del receptor. No es parte del contrato de
+// trama con el emisor.
 
 export interface RegistroTrama {
   id: string;

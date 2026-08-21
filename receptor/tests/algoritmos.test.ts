@@ -1,6 +1,4 @@
-// Tests de los algoritmos del receptor, contra los vectores dorados
-// compartidos con el emisor (shared/vectores.json). Espejo de
-// emisor/tests/test_algoritmos.py — si algo diverge de allá, es un bug.
+// Tests de los algoritmos contra los vectores dorados de shared/vectores.json.
 
 import { readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
@@ -38,14 +36,10 @@ function voltear(bits: string, indice: number): string {
   return bits.slice(0, indice) + flip + bits.slice(indice + 1);
 }
 
-// "Hola mundo" en ASCII binario (80 bits), tomado directo de shared/vectores.json.
+// "Hola mundo" en ASCII binario, tomado de shared/vectores.json.
 const BITS_HOLA_MUNDO = VECTORES.vectores.find(
   (v) => v.mensaje === "Hola mundo" && v.algoritmo === "hamming" && v.params.m === 8,
 )!.bits_ascii;
-
-// -----------------------------------------------------------------------------
-// CRC-32
-// -----------------------------------------------------------------------------
 
 describe("crc32", () => {
   // PROTOCOLO.md §6: si esto falla, nada más importa.
@@ -75,10 +69,6 @@ describe("crc32", () => {
     expect(() => crc32.verificar("1".repeat(32))).toThrow(crc32.ErrorCRC32);
   });
 });
-
-// -----------------------------------------------------------------------------
-// Hamming
-// -----------------------------------------------------------------------------
 
 describe("hamming", () => {
   // PROTOCOLO.md §5: m=4->n=7 · m=8->n=12 · m=11->n=15 · m=16->n=21.
@@ -147,10 +137,6 @@ describe("hamming", () => {
   });
 });
 
-// -----------------------------------------------------------------------------
-// Vectores dorados compartidos con el emisor (Python)
-// -----------------------------------------------------------------------------
-
 describe("vectores dorados", () => {
   for (const vector of VECTORES.vectores) {
     const etiqueta = `${vector.mensaje} / ${vector.algoritmo}${vector.params.m ? ` m=${vector.params.m}` : ""}`;
@@ -158,11 +144,8 @@ describe("vectores dorados", () => {
     it(`codifica igual que el emisor: ${etiqueta}`, () => {
       expect(vector.bits_ascii.length).toBe(vector.longitud_original_bits);
 
-      // vectores.json define "bits_redundancia" como el overhead TOTAL
-      // (trama - mensaje original: relleno + redundancia propia del
-      // algoritmo), a diferencia de la propiedad `bitsRedundancia` de cada
-      // algoritmo (que en Hamming excluye el relleno de bloque). Ver
-      // PLAN_IMPLEMENTACION.md — "Overhead % = redundancia / total".
+      // bits_redundancia en el vector es overhead total (trama - original),
+      // no la propiedad bitsRedundancia del algoritmo.
       if (vector.algoritmo === "hamming") {
         const resultado = hamming.codificar(vector.bits_ascii, vector.params.m ?? 8);
         expect(resultado.trama).toBe(vector.trama_esperada);

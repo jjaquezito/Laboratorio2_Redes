@@ -1,15 +1,5 @@
-// -----------------------------------------------------------------------------
-// Capa de APLICACIÓN — servicio mostrar_mensaje
-// Especificación: shared/PROTOCOLO.md §2
-// -----------------------------------------------------------------------------
-// Punto de entrada del receptor: recibe la trama cruda (ya deserializada por
-// la capa de transmisión) y orquesta la subida por la pila
-//
-//     TRANSMISIÓN -> ENLACE -> PRESENTACIÓN -> APLICACIÓN
-//
-// Si la integridad no se pudo verificar o corregir, `mensaje` queda en
-// `null` — es la capa de transmisión/UI la que decide cómo mostrar el error.
-// -----------------------------------------------------------------------------
+// Capa de APLICACIÓN — servicio mostrar_mensaje.
+// Especificación: shared/PROTOCOLO.md §2.
 
 import * as enlace from "./enlace.js";
 import * as presentacion from "./presentacion.js";

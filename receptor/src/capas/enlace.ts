@@ -1,11 +1,5 @@
-// -----------------------------------------------------------------------------
-// Capa de ENLACE — servicios verificar_integridad / corregir_mensaje
-// Especificación: shared/PROTOCOLO.md §5 y §6
-// -----------------------------------------------------------------------------
-// Recalcula la información de integridad del lado del receptor y la compara
-// contra la trama recibida. Si el algoritmo puede corregir (Hamming), lo hace
-// aquí mismo — es la contraparte de enlace.calcular_integridad del emisor.
-// -----------------------------------------------------------------------------
+// Capa de ENLACE — servicios verificar_integridad / corregir_mensaje.
+// Especificación: shared/PROTOCOLO.md §5 y §6.
 
 import * as crc32 from "../algoritmos/crc32.js";
 import * as hamming from "../algoritmos/hamming.js";

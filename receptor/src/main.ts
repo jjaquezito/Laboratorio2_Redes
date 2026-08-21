@@ -1,16 +1,5 @@
-// -----------------------------------------------------------------------------
-// RECEPTOR — punto de entrada
-// -----------------------------------------------------------------------------
-// Levanta dos servidores:
-//
-//   TCP  (puerto 5001) — §1 y §3 del protocolo. Aquí habla el emisor: recibe
-//        tramas NDJSON, las verifica/corrige y responde telemetría.
-//   HTTP (puerto 3000) — Express sirve el build de React y expone un
-//        WebSocket en /ws con el mismo historial en vivo (extensión fuera
-//        del enunciado, igual que la telemetría del §3).
-//
-// Arranque:  npm run dev   (o: node dist/main.js --host 0.0.0.0 --puerto 5001 --puerto-ui 3000)
-// -----------------------------------------------------------------------------
+// RECEPTOR — punto de entrada. Levanta el servidor TCP del protocolo
+// (emisor <-> receptor) y el servidor HTTP/WS de la UI.
 
 import { existsSync } from "node:fs";
 import http from "node:http";

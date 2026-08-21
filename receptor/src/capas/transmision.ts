@@ -1,17 +1,5 @@
-// -----------------------------------------------------------------------------
-// Capa de TRANSMISIÓN — servicio recibir_informacion
-// Especificación: shared/PROTOCOLO.md §1 y §3
-// -----------------------------------------------------------------------------
-// Canal  : TCP con NDJSON — un objeto JSON por línea, terminado en \n, UTF-8
-// Puerto : 5001 por defecto
-// Sesión : el receptor siempre está escuchando; el emisor abre una conexión
-//          por mensaje, así que cada socket puede traer varias líneas o solo
-//          una — se procesa línea por línea a medida que llegan
-//
-// Por cada trama de datos recibida, se responde por el mismo socket con un
-// objeto de telemetría (§3). Esa respuesta es una extensión fuera del
-// enunciado: alimenta la UI y la suite de experimentos del emisor.
-// -----------------------------------------------------------------------------
+// Capa de TRANSMISIÓN — servicio recibir_informacion.
+// Especificación: shared/PROTOCOLO.md §1 y §3.
 
 import net from "node:net";
 import type { TramaRecibida, ResultadoRecepcion } from "./aplicacion.js";
@@ -19,12 +7,12 @@ import type { TramaRecibida, ResultadoRecepcion } from "./aplicacion.js";
 export const HOST_POR_DEFECTO = "0.0.0.0";
 export const PUERTO_POR_DEFECTO = 5001;
 
-// Trama de datos tal como llega por el socket (§2 del protocolo).
+// Trama de datos tal como llega por el socket.
 export interface TramaEntrante extends TramaRecibida {
   id: string;
 }
 
-// Telemetría de vuelta al emisor (§3 del protocolo).
+// Telemetría de vuelta al emisor.
 export interface Telemetria {
   id: string;
   estado: string;
@@ -36,10 +24,8 @@ export interface Telemetria {
 
 export type Manejador = (trama: TramaEntrante) => ResultadoRecepcion;
 
-// Procesa una línea NDJSON: parsea, delega a `manejar` y arma la telemetría.
-// Cualquier excepción (JSON inválido, algoritmo desconocido, trama
-// desalineada) se reporta como `error_no_corregible` en vez de tumbar la
-// conexión — el receptor siempre debe seguir escuchando.
+// Procesa una línea NDJSON; cualquier excepción se reporta como
+// error_no_corregible en vez de tumbar la conexión.
 export function procesarLinea(linea: string, manejar: Manejador): Telemetria {
   const inicio = performance.now();
   let id = "";
@@ -67,8 +53,7 @@ export function procesarLinea(linea: string, manejar: Manejador): Telemetria {
   }
 }
 
-// Levanta el servidor TCP. Una conexión puede traer varias líneas NDJSON
-// seguidas; se van despachando a medida que se completan.
+// Levanta el servidor TCP; despacha cada línea NDJSON a medida que llega.
 export function crearServidor(manejar: Manejador): net.Server {
   return net.createServer((socket) => {
     socket.setEncoding("utf-8");

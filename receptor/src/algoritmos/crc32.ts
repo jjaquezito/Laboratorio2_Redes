@@ -1,18 +1,5 @@
-// -----------------------------------------------------------------------------
-// CRC-32 IEEE 802.3 — algoritmo de DETECCIÓN de errores
-// Especificación: shared/PROTOCOLO.md §6
-// -----------------------------------------------------------------------------
-// Polinomio  : 0x04C11DB7  (forma reflejada 0xEDB88320)
-// Parámetros : init 0xFFFFFFFF · reflect in/out · xorout 0xFFFFFFFF
-// Vector     : CRC32("123456789") = 0xCBF43926  (obligatorio)
-// Padding    : ceros a la derecha hasta 32 bits si el mensaje mide menos
-// Trama      : bits de datos (ya con padding) + 32 bits de CRC, MSB primero
-//
-// CRC-32 no corrige: solo distingue una trama íntegra de una corrupta.
-//
-// Debe producir exactamente lo mismo que el crc32.py del emisor; los vectores
-// dorados de shared/vectores.json lo verifican.
-// -----------------------------------------------------------------------------
+// CRC-32 IEEE 802.3. Especificación: shared/PROTOCOLO.md §6.
+// Debe producir lo mismo que crc32.py del emisor (shared/vectores.json).
 
 export const NOMBRE = "crc32" as const;
 export const TIPO = "deteccion" as const;
@@ -48,7 +35,7 @@ function construirTabla(): readonly number[] {
 
 const TABLA = construirTabla();
 
-// CRC-32 sobre una secuencia de bytes. Devuelve un entero de 32 bits (0..2^32-1).
+// CRC-32 sobre una secuencia de bytes.
 export function crc32Bytes(datos: Uint8Array): number {
   let crc = VALOR_INICIAL;
   for (const byte of datos) {
@@ -57,8 +44,7 @@ export function crc32Bytes(datos: Uint8Array): number {
   return (crc ^ XOR_FINAL) >>> 0;
 }
 
-// CRC-32 sobre una cadena de bits. La longitud debe ser múltiplo de 8, cosa
-// que aquí siempre se cumple porque todo el bitstream viene de ASCII 8 bits.
+// CRC-32 sobre una cadena de bits; la longitud debe ser múltiplo de 8.
 export function crc32Bits(bits: string): number {
   if (!/^[01]*$/.test(bits)) {
     throw new ErrorCRC32("el bitstream solo puede contener '0' y '1'");
