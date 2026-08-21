@@ -164,7 +164,7 @@ export type EstadoHamming = "ok" | "corregido" | "error_no_corregible";
 // Salida de verificar(): lo que la capa de enlace del receptor consume.
 export interface VerificacionHamming {
   estado: EstadoHamming;
-  bits: string;
+  bits: string | null;
   bitsCorregidos: number[];
   detalle: { sindromes: number[]; m: number; n: number; r: number };
 }
@@ -205,7 +205,7 @@ export function verificar(trama: string, m = 8): VerificacionHamming {
 
   return {
     estado,
-    bits: datos.join(""),
+    bits: estado === "error_no_corregible" ? null : datos.join(""),
     bitsCorregidos: corregidos,
     detalle: { sindromes, m, n, r },
   };
