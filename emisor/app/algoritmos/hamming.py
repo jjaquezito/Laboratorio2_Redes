@@ -203,9 +203,12 @@ def verificar(trama: str, m: int = 8) -> dict:
     else:
         estado = "ok"
 
+    # PROTOCOLO.md §3: el mensaje es null cuando la trama no es confiable. Si un
+    # bloque tuvo >= 2 errores, los datos extraídos son basura y no deben
+    # entregarse, aunque el resto de la trama haya quedado bien.
     return {
         "estado": estado,
-        "bits": "".join(datos),
+        "bits": None if estado == "error_no_corregible" else "".join(datos),
         "bits_corregidos": corregidos,
         "detalle": {"sindromes": sindromes, "m": m, "n": n, "r": r},
     }
