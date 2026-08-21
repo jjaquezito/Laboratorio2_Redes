@@ -177,6 +177,24 @@ def test_hamming_no_entrega_bits_cuando_no_es_corregible(m):
     assert resultado["bits"] is None
 
 
+# Un codigo de Hamming es perfecto cuando n == 2**r - 1: todo sindrome apunta a
+# una posicion valida, asi que con 2 errores en un bloque NUNCA puede reportar
+# error_no_corregible y siempre corrige mal en silencio. Es el peor caso para la
+# integridad y depende del m elegido, no de la tasa de error.
+@pytest.mark.parametrize("m, perfecto", [(4, True), (8, False), (11, True), (16, False)])
+def test_hamming_perfecto_no_puede_declararse_no_corregible(m, perfecto):
+    n, r = hamming.dimensiones(m)
+    assert (n == 2**r - 1) is perfecto
+
+    fuera_de_rango = [
+        (p, q)
+        for p in range(1, n + 1)
+        for q in range(p + 1, n + 1)
+        if p ^ q > n
+    ]
+    assert (fuera_de_rango == []) is perfecto
+
+
 # CRC-32 ya cumplia la misma regla; se comprueban juntos para que no diverjan.
 def test_ambos_algoritmos_callan_el_mensaje_si_no_es_confiable():
     crc = crc32.codificar(presentacion.codificar_mensaje("Mensaje de prueba"))
