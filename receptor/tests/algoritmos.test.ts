@@ -102,7 +102,7 @@ describe("hamming", () => {
       const resultado = hamming.verificar(voltear(trama, indice), m);
       expect(resultado.estado).toBe("corregido");
       expect(resultado.bitsCorregidos).toEqual([indice]);
-      expect(resultado.bits).toBe(datos);
+      expect(resultado.bits!).toBe(datos);
     }
   });
 
@@ -112,7 +112,7 @@ describe("hamming", () => {
     const resultado = hamming.verificar(trama, 8);
     expect(resultado.estado).toBe("ok");
     expect(resultado.bitsCorregidos).toEqual([]);
-    expect(resultado.bits.slice(0, bits.length)).toBe(bits);
+    expect(resultado.bits!.slice(0, bits.length)).toBe(bits);
   });
 
   // El modo por bloques corrige 1 error *por bloque*, no 1 en toda la trama.
@@ -129,11 +129,40 @@ describe("hamming", () => {
     const resultado = hamming.verificar(trama, 8);
     expect(resultado.estado).toBe("corregido");
     expect(resultado.bitsCorregidos.length).toBe(codificado.bloques.length);
-    expect(resultado.bits.slice(0, bits.length)).toBe(bits);
+    expect(resultado.bits!.slice(0, bits.length)).toBe(bits);
   });
 
   it("rechaza trama desalineada", () => {
     expect(() => hamming.verificar("1".repeat(13), 8)).toThrow(hamming.ErrorHamming);
+  });
+
+  // Busca un par de posiciones 1-based (p, q) dentro de un bloque de tamaño n
+  // cuyo síndrome p^q exceda n: eso es lo que hace que un bloque se declare
+  // "no corregible" en vez de corregirse mal en silencio con 2 errores.
+  function tramaNoCorregible(bits: string, m: number): string {
+    const [n] = hamming.dimensiones(m);
+    const trama = hamming.codificar(bits, m).trama;
+    for (let p = 1; p <= n; p++) {
+      for (let q = p + 1; q <= n; q++) {
+        if ((p ^ q) > n) return voltear(voltear(trama, p - 1), q - 1);
+      }
+    }
+    throw new Error(`no hay sindrome fuera de rango para m=${m}`);
+  }
+
+  // PROTOCOLO.md §3: bits debe ser null cuando estado es "error_no_corregible".
+  // Un código de Hamming es "perfecto" cuando n === 2**r - 1: todo síndrome
+  // apunta a una posición válida, así que 2 errores en un bloque JAMÁS se
+  // declaran no corregibles (siempre se "corrigen" mal en silencio). m=4 (n=7)
+  // y m=11 (n=15) son perfectos y no pueden producir este caso; m=8 (n=12) y
+  // m=16 (n=21) no lo son. Para m=8, el par (1, 12) basta: síndrome 1^12=13>12.
+  it.each([8, 16])("no entrega bits cuando un bloque no es corregible (m=%i)", (m) => {
+    const datos = Array.from({ length: m }, (_, i) => ((i * 7 + 3) % 2).toString()).join("");
+    const tramaCorrupta = tramaNoCorregible(datos, m);
+
+    const resultado = hamming.verificar(tramaCorrupta, m);
+    expect(resultado.estado).toBe("error_no_corregible");
+    expect(resultado.bits).toBeNull();
   });
 });
 
@@ -163,7 +192,7 @@ describe("vectores dorados", () => {
       if (vector.algoritmo === "hamming") {
         const resultado = hamming.verificar(vector.trama_esperada, vector.params.m ?? 8);
         expect(resultado.estado).toBe("ok");
-        expect(resultado.bits.slice(0, vector.longitud_original_bits)).toBe(vector.bits_ascii);
+        expect(resultado.bits!.slice(0, vector.longitud_original_bits)).toBe(vector.bits_ascii);
       } else {
         const resultado = crc32.verificar(vector.trama_esperada);
         expect(resultado.estado).toBe("ok");
