@@ -152,6 +152,57 @@ def test_hamming_dos_errores_en_un_bloque_no_se_recuperan():
     assert fallos == 66  # C(12,2)
 
 
+# Dos errores en un bloque dan sindrome p^q (posiciones 1-based). Solo cuando ese
+# valor excede n el bloque se declara no corregible; en el resto de los casos
+# Hamming "corrige" mal y entrega basura, que es el modo de fallo silencioso.
+def _trama_no_corregible(mensaje: str, m: int = 8) -> str:
+    n, _ = hamming.dimensiones(m)
+    trama = hamming.codificar(presentacion.codificar_mensaje(mensaje), m).trama
+    for p in range(1, n + 1):
+        for q in range(p + 1, n + 1):
+            if p ^ q > n:
+                return voltear(voltear(trama, p - 1), q - 1)
+    raise AssertionError(f"no hay sindrome fuera de rango para m={m}")
+
+
+# PROTOCOLO.md §3: si la trama no es confiable, no se entrega mensaje. Los datos
+# de un bloque con >= 2 errores son basura y no deben salir de la capa de enlace,
+# aunque el resto de la trama haya quedado intacta.
+# Solo los codigos NO perfectos (n < 2**r - 1) tienen sindromes fuera de rango.
+@pytest.mark.parametrize("m", [8, 16])
+def test_hamming_no_entrega_bits_cuando_no_es_corregible(m):
+    resultado = hamming.verificar(_trama_no_corregible("Mensaje de prueba", m), m)
+
+    assert resultado["estado"] == "error_no_corregible"
+    assert resultado["bits"] is None
+
+
+# Un codigo de Hamming es perfecto cuando n == 2**r - 1: todo sindrome apunta a
+# una posicion valida, asi que con 2 errores en un bloque NUNCA puede reportar
+# error_no_corregible y siempre corrige mal en silencio. Es el peor caso para la
+# integridad y depende del m elegido, no de la tasa de error.
+@pytest.mark.parametrize("m, perfecto", [(4, True), (8, False), (11, True), (16, False)])
+def test_hamming_perfecto_no_puede_declararse_no_corregible(m, perfecto):
+    n, r = hamming.dimensiones(m)
+    assert (n == 2**r - 1) is perfecto
+
+    fuera_de_rango = [
+        (p, q)
+        for p in range(1, n + 1)
+        for q in range(p + 1, n + 1)
+        if p ^ q > n
+    ]
+    assert (fuera_de_rango == []) is perfecto
+
+
+# CRC-32 ya cumplia la misma regla; se comprueban juntos para que no diverjan.
+def test_ambos_algoritmos_callan_el_mensaje_si_no_es_confiable():
+    crc = crc32.codificar(presentacion.codificar_mensaje("Mensaje de prueba"))
+    assert crc32.verificar(voltear(crc.trama, 3))["bits"] is None
+
+    assert hamming.verificar(_trama_no_corregible("Mensaje de prueba"), 8)["bits"] is None
+
+
 def test_hamming_rechaza_trama_desalineada():
     with pytest.raises(hamming.ErrorHamming):
         hamming.verificar("1" * 13, 8)
