@@ -205,7 +205,8 @@ export function PanelExperimentos({ config, receptorActivo, host, puerto }: Prop
         !ocupado && (
           <div className="tarjeta">
             <div className="vacio">
-              Corre el barrido para generar las gráficas del informe.
+              Aún no hay resultados. Al ejecutar el barrido aparecerán aquí las
+              cuatro gráficas y la tabla de datos.
             </div>
           </div>
         )

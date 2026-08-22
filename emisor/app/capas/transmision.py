@@ -113,6 +113,118 @@ def enviar_informacion(
 
 
 # ``True`` si hay un receptor escuchando. La UI lo usa como indicador.
+# Conexión reutilizable para enviar muchas tramas seguidas.
+#
+# `enviar_informacion` abre y cierra un socket por mensaje, lo que es lo más
+# simple para un envío suelto pero no escala: cada cierre deja el puerto local en
+# TIME_WAIT durante segundos y un barrido de decenas de miles de envíos agota el
+# rango efímero del sistema (en macOS, 49152-65535) con "Can't assign requested
+# address". NDJSON está pensado para multiplexar tramas sobre una sola conexión,
+# así que la suite de experimentos usa esta clase.
+#
+# Si el receptor se reinicia a mitad del barrido, el siguiente envío reconecta
+# de forma transparente en lugar de abortar.
+class Conexion:
+    def __init__(
+        self,
+        host: str = HOST_POR_DEFECTO,
+        puerto: int = PUERTO_POR_DEFECTO,
+        timeout: float = TIMEOUT_POR_DEFECTO,
+    ) -> None:
+        self.host = host
+        self.puerto = puerto
+        self.timeout = timeout
+        self._sock: socket.socket | None = None
+        self._buffer = bytearray()
+
+    def __enter__(self) -> "Conexion":
+        self.abrir()
+        return self
+
+    def __exit__(self, *_excepcion: object) -> None:
+        self.cerrar()
+
+    def abrir(self) -> None:
+        self.cerrar()
+        try:
+            self._sock = socket.create_connection(
+                (self.host, self.puerto), timeout=self.timeout
+            )
+        except ConnectionRefusedError as exc:
+            raise ErrorTransmision(
+                f"no hay ningún receptor escuchando en {self.host}:{self.puerto}. "
+                "Levanta el receptor antes de enviar."
+            ) from exc
+        except OSError as exc:
+            raise ErrorTransmision(
+                f"fallo de red contra {self.host}:{self.puerto}: {exc}"
+            ) from exc
+        self._buffer.clear()
+
+    def cerrar(self) -> None:
+        if self._sock is not None:
+            try:
+                self._sock.close()
+            except OSError:
+                pass
+            self._sock = None
+        self._buffer.clear()
+
+    # Lee una línea NDJSON del buffer, rellenándolo desde el socket si hace falta.
+    def _leer_linea(self) -> str | None:
+        assert self._sock is not None
+        while b"\n" not in self._buffer:
+            try:
+                trozo = self._sock.recv(4096)
+            except socket.timeout:
+                return None
+            if not trozo:
+                return None
+            self._buffer.extend(trozo)
+        linea, _, resto = self._buffer.partition(b"\n")
+        self._buffer = bytearray(resto)
+        return linea.decode("utf-8")
+
+    def enviar(
+        self, trama_json: dict[str, Any], esperar_telemetria: bool = True
+    ) -> Telemetria | None:
+        linea = (
+            json.dumps(trama_json, ensure_ascii=False, separators=(",", ":")) + "\n"
+        ).encode("utf-8")
+
+        for intento in (1, 2):
+            if self._sock is None:
+                self.abrir()
+            try:
+                self._sock.sendall(linea)  # type: ignore[union-attr]
+                if not esperar_telemetria:
+                    return None
+                respuesta = self._leer_linea()
+                if respuesta is None:
+                    raise ConnectionResetError("el receptor cerró la conexión")
+                return Telemetria.desde_json(json.loads(respuesta))
+            except (ConnectionResetError, BrokenPipeError, ConnectionAbortedError):
+                # El receptor se reinició: reconectar y reintentar una sola vez.
+                self.cerrar()
+                if intento == 2:
+                    raise ErrorTransmision(
+                        f"el receptor en {self.host}:{self.puerto} cerró la conexión"
+                    ) from None
+            except socket.timeout as exc:
+                self.cerrar()
+                raise ErrorTransmision(
+                    f"tiempo de espera agotado ({self.timeout}s) hablando con "
+                    f"{self.host}:{self.puerto}"
+                ) from exc
+            except json.JSONDecodeError as exc:
+                self.cerrar()
+                raise ErrorTransmision(
+                    "el receptor respondió algo que no es JSON"
+                ) from exc
+
+        return None
+
+
 def probar_conexion(
     host: str = HOST_POR_DEFECTO,
     puerto: int = PUERTO_POR_DEFECTO,

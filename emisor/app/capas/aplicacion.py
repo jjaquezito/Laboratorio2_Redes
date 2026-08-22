@@ -153,6 +153,7 @@ def solicitar_mensaje(
     puerto: int = transmision.PUERTO_POR_DEFECTO,
     esperar_telemetria: bool = True,
     timeout: float = transmision.TIMEOUT_POR_DEFECTO,
+    conexion: transmision.Conexion | None = None,
 ) -> ResultadoEnvio:
     resultado = preparar_envio(
         mensaje,
@@ -164,14 +165,22 @@ def solicitar_mensaje(
         parametro_ruido=parametro_ruido,
     )
 
+    # Con `conexion` se reutiliza un socket ya abierto: lo usa la suite de
+    # experimentos, donde abrir uno por mensaje agotaría los puertos efímeros.
     try:
-        telemetria = transmision.enviar_informacion(
-            resultado.trama_para_receptor(),
-            host=host,
-            puerto=puerto,
-            timeout=timeout,
-            esperar_telemetria=esperar_telemetria,
-        )
+        if conexion is not None:
+            telemetria = conexion.enviar(
+                resultado.trama_para_receptor(),
+                esperar_telemetria=esperar_telemetria,
+            )
+        else:
+            telemetria = transmision.enviar_informacion(
+                resultado.trama_para_receptor(),
+                host=host,
+                puerto=puerto,
+                timeout=timeout,
+                esperar_telemetria=esperar_telemetria,
+            )
         resultado.enviado = True
         resultado.telemetria = asdict(telemetria) if telemetria else None
     except transmision.ErrorTransmision as exc:
