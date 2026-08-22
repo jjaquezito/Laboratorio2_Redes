@@ -183,11 +183,12 @@ def _una_corrida(
     modo: str,
     host: str,
     puerto: int,
+    conexion: transmision.Conexion | None = None,
 ) -> Corrida:
     if modo == "socket":
         resultado = aplicacion.solicitar_mensaje(
             mensaje, algoritmo, params, tasa_error=ber, semilla=semilla,
-            host=host, puerto=puerto,
+            host=host, puerto=puerto, conexion=conexion,
         )
         if not resultado.enviado:
             raise transmision.ErrorTransmision(resultado.error_transmision or "")
@@ -273,23 +274,36 @@ def barrer(
     hechas = 0
     contador = 0
 
-    for bits in tamanos:
-        mensaje = mensaje_de_n_bits(bits)
-        for algoritmo, params in configuraciones:
-            for ber in bers:
-                corridas = []
-                for _ in range(repeticiones):
-                    contador += 1
-                    sub = None if semilla is None else semilla + contador
-                    corridas.append(
-                        _una_corrida(
-                            mensaje, algoritmo, params, ber, sub, modo, host, puerto
+    # Un barrido son decenas de miles de envíos. En modo socket se reutiliza una
+    # sola conexión: abrir una por mensaje agota los puertos efímeros del sistema
+    # a las ~16 000 tramas y el barrido muere con "Can't assign requested
+    # address". NDJSON permite multiplexar y el receptor ya lo soporta.
+    conexion = transmision.Conexion(host, puerto) if modo == "socket" else None
+    try:
+        if conexion is not None:
+            conexion.abrir()
+
+        for bits in tamanos:
+            mensaje = mensaje_de_n_bits(bits)
+            for algoritmo, params in configuraciones:
+                for ber in bers:
+                    corridas = []
+                    for _ in range(repeticiones):
+                        contador += 1
+                        sub = None if semilla is None else semilla + contador
+                        corridas.append(
+                            _una_corrida(
+                                mensaje, algoritmo, params, ber, sub, modo,
+                                host, puerto, conexion,
+                            )
                         )
-                    )
-                hechas += 1
-                if progreso:
-                    progreso(hechas, total)
-                yield agregar(corridas)
+                    hechas += 1
+                    if progreso:
+                        progreso(hechas, total)
+                    yield agregar(corridas)
+    finally:
+        if conexion is not None:
+            conexion.cerrar()
 
 
 # Serializa los resultados a CSV para `docs/resultados/` y el informe.
