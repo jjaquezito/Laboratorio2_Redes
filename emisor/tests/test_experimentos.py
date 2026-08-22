@@ -4,10 +4,78 @@ from __future__ import annotations
 
 import csv
 import io
+import json
+import socket
+import threading
 
 import pytest
 
+from app.capas import enlace, presentacion
 from app.experimentos import runner
+
+
+# Receptor NDJSON de prueba que cuenta cuántas conexiones y cuántas tramas vio.
+class _ReceptorContador:
+    def __init__(self) -> None:
+        self.servidor = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        self.servidor.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+        self.servidor.bind(("127.0.0.1", 0))
+        self.servidor.listen(4)
+        self.puerto = self.servidor.getsockname()[1]
+        self.conexiones = 0
+        self.tramas = 0
+        threading.Thread(target=self._atender, daemon=True).start()
+
+    def _atender(self) -> None:
+        while True:
+            try:
+                conexion, _ = self.servidor.accept()
+            except OSError:
+                return
+            self.conexiones += 1
+            threading.Thread(
+                target=self._sesion, args=(conexion,), daemon=True
+            ).start()
+
+    def _sesion(self, conexion: socket.socket) -> None:
+        with conexion, conexion.makefile("rb") as flujo:
+            for linea in flujo:
+                linea = linea.strip()
+                if not linea:
+                    continue
+                self.tramas += 1
+                trama = json.loads(linea)
+                verificado = enlace.verificar_integridad(
+                    trama["trama"], trama["algoritmo"], trama["params"]
+                )
+                mensaje = (
+                    presentacion.decodificar_mensaje(
+                        verificado["bits"], trama["longitud_original_bits"]
+                    )
+                    if verificado["bits"] is not None
+                    else None
+                )
+                conexion.sendall(
+                    (json.dumps({
+                        "id": trama["id"],
+                        "estado": verificado["estado"],
+                        "mensaje": mensaje,
+                        "bits_corregidos": verificado["bits_corregidos"],
+                        "detalle": verificado["detalle"],
+                        "ms_procesamiento": 0.0,
+                    }) + "\n").encode()
+                )
+
+    def cerrar(self) -> None:
+        self.servidor.close()
+
+
+@pytest.fixture
+def receptor_contador():
+    servidor = _ReceptorContador()
+    yield servidor
+    servidor.cerrar()
+
 
 
 # Quita las columnas de reloj de pared, que no son deterministas.
@@ -132,8 +200,9 @@ def test_csv_vacio_no_revienta():
     assert runner.a_csv([]) == ""
 
 
-# En modo 'socket' cada envío debe pasar por la capa de transmisión.
-def test_barrido_por_socket_usa_el_receptor(monkeypatch):
+# Sin receptor, el barrido en modo socket falla al abrir la conexión y no llega a
+# emitir ninguna trama: es preferible a descubrirlo a los cientos de envíos.
+def test_barrido_por_socket_falla_rapido_sin_receptor(monkeypatch):
     llamadas = []
     original = runner.aplicacion.solicitar_mensaje
 
@@ -144,7 +213,34 @@ def test_barrido_por_socket_usa_el_receptor(monkeypatch):
     monkeypatch.setattr(runner.aplicacion, "solicitar_mensaje", espia)
     with pytest.raises(runner.transmision.ErrorTransmision):
         list(runner.barrer(
-            tamanos=[64], bers=[0.0], repeticiones=1,
+            tamanos=[64], bers=[0.0], repeticiones=50,
             configuraciones=[("crc32", {})], modo="socket", puerto=1,
         ))
-    assert llamadas == [1]
+    assert llamadas == []
+
+
+# El barrido reutiliza UNA conexión para todas sus tramas. Abrir una por mensaje
+# agota los puertos efímeros del sistema (~16 000 en macOS) y el barrido muere a
+# media corrida con "Can't assign requested address".
+def test_barrido_por_socket_reutiliza_una_sola_conexion(receptor_contador):
+    agregados = list(runner.barrer(
+        tamanos=[64], bers=[0.0, 0.01], repeticiones=40,
+        configuraciones=[("hamming", {"m": 8}), ("crc32", {})],
+        semilla=1, modo="socket", puerto=receptor_contador.puerto,
+    ))
+
+    assert len(agregados) == 4
+    assert sum(a.repeticiones for a in agregados) == 160
+    assert receptor_contador.tramas == 160
+    assert receptor_contador.conexiones == 1
+
+
+# La telemetría del receptor real debe llegar y ser coherente con el protocolo.
+def test_barrido_por_socket_recoge_los_veredictos(receptor_contador):
+    agregados = list(runner.barrer(
+        tamanos=[64], bers=[0.0], repeticiones=30,
+        configuraciones=[("hamming", {"m": 8})],
+        semilla=1, modo="socket", puerto=receptor_contador.puerto,
+    ))
+    assert agregados[0].tasa_entrega == 1.0
+    assert agregados[0].conteo_estados["ok"] == 30
